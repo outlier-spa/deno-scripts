@@ -20,5 +20,6 @@ if (!org || !repo || !token){
 } else {
 	const result = await (getIssuesPage());
 	const issues = result.filter((issue: any) => !issue.pull_request)
+	Deno.writeTextFileSync('issues.json', JSON.stringify(issues, null, 2));
 	console.log({issueCount: issues.length});
 }
