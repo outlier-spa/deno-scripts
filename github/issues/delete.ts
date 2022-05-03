@@ -8,19 +8,9 @@ const headers = {
 	authorization: `bearer ${token}`
 };
 
-async function getIssuesPage(page: number = 1, maxPages: number = Infinity): Promise<any[]> {
-	const url = `https://api.github.com/repos/${org}/${repo}/issues?state=all&per_page=100&page=${page}`;
-	const result = await (await fetch(url, { headers})).json();
-	if (result.length === 100 && page < maxPages) return result.concat(await getIssuesPage(page+1, maxPages));
-	return result;
-}
-
-if (!org || !repo || !token){
-	console.error('param cannot be empty\nuse:\n--org org-name --repo repo-name --token bearer-token');
-} else {
-	const result = await (getIssuesPage());
-	const issues = result.filter((issue: any) => !issue.pull_request);
-	await Promise.all(issues.map(async (issue) => {
+async function deleteIssues(issues: any[]): Promise<void> {
+	const filtered = issues.filter((issue: any) => !issue.pull_request);
+	await Promise.all(filtered.map(async (issue) => {
     var cmd = [`gh`, 'issue', 'delete', '--repo', 'spence-database', issue.number];
 		const p = Deno.run({
 			cmd: cmd,
@@ -32,6 +22,21 @@ if (!org || !repo || !token){
 		await p.stdin.write(new TextEncoder().encode(issue.number));
 		p.stdin.close();
   }));
+}
+
+async function getIssuesPage(page: number = 1, maxPages: number = Infinity): Promise<any[]> {
+	const url = `https://api.github.com/repos/${org}/${repo}/issues?state=all&per_page=100&page=${page}`;
+	const result = await (await fetch(url, { headers})).json();
+	await deleteIssues(result);
+	if (result.length === 100 && page < maxPages) return result.concat(await getIssuesPage(page+1, maxPages));
+	return result;
+}
+
+if (!org || !repo || !token){
+	console.error('param cannot be empty\nuse:\n--org org-name --repo repo-name --token bearer-token');
+} else {
+	const result = await (getIssuesPage());
+	const issues = result.filter((issue: any) => !issue.pull_request);
 	Deno.writeTextFileSync('issues.json', JSON.stringify(issues, null, 2));
 	console.log({issueCount: issues.length});
 }
